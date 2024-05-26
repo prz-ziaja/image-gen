@@ -15,7 +15,7 @@ from ray.train.lightning import (
 from ray.train.torch import TorchConfig, TorchTrainer
 from ray.tune.schedulers import ASHAScheduler
 
-import image_gen
+import utils as u
 
 
 def build_train_func(model_module, data_module, data_location, experiment_name):
@@ -69,13 +69,12 @@ def tune_hms_asha(ray_trainer, search_space, num_epochs, num_samples=10):
 
 
 def main(module_name):
-    pipeline_config_module = importlib.import_module(
-        f"image_gen.pipeline_configs.{module_name}"
-    )
+    pipeline_config_module = importlib.import_module(module_name)
     model_name = pipeline_config_module.training["model_name"]
     dataset_name = pipeline_config_module.preprocessing["dataset_name"]
     model_hparams = pipeline_config_module.training["hparams"]
     scaling_config = pipeline_config_module.training["scaling_config"]
+    experiment_name = pipeline_config_module.training["experiment_name"]
 
     model_module = importlib.import_module(f"image_gen.models.{model_name}")
     dataset_module = importlib.import_module(f"image_gen.io.datasets.{dataset_name}")
@@ -85,7 +84,7 @@ def main(module_name):
     #mlflow.set_experiment(model_name)
 
     train_func = build_train_func(
-        model_module, dataset_module.dataloader, data_location, experiment_name=model_name
+        model_module, dataset_module.dataloader, data_location, experiment_name=experiment_name
     )
 
     # The maximum training epochs
@@ -118,5 +117,6 @@ def main(module_name):
 
 
 if __name__ == "__main__":
-    ray.init(runtime_env={"py_modules": [image_gen], "conda": "ray"})
-    main("simple_cnn_arch")
+    args = u.parse_args()
+    u.ray_connect(args)
+    main(args.pipeline_config)

@@ -9,6 +9,7 @@ training = {
     "max_num_epochs": 4,
     "max_num_samples": 10,
     "model_name": "simple_cnn_arch",
+    "experiment_name": "generator",
     "scaling_config": {
         "num_workers": 1,
         #"resources_per_worker": {"CPU": 3},
