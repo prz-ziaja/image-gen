@@ -14,7 +14,7 @@ def main(dataset_module_name):
     source_loader_module, source_loader_name, source_loader_args = (
         dataset_module.source_loader
     )
-    output_writer_module, output_writer_name, output_writer_args = (
+    _, output_writer_name, writer_args, _ = (
         dataset_module.output_writer
     )
 
@@ -22,25 +22,21 @@ def main(dataset_module_name):
     source_loader = importlib.import_module(source_loader_module).__getattribute__(
         source_loader_name
     )
-    output_writer = importlib.import_module(output_writer_module).__getattribute__(
-        output_writer_name
-    )
 
-    dataset = source_loader(**source_loader_args)
+    dataset = ray.data.from_pandas(source_loader(**source_loader_args))
 
-    for plugin_module, plugin_name, plugin_args in dataset_module.plugins:
-        plugin = u.function_builder(
-            importlib.import_module(plugin_module).__getattribute__(plugin_name),
-            **plugin_args
-        )
+    for plugin_module, plugin_name, plugin_args, map_args in dataset_module.plugins:
+        plugin = importlib.import_module(plugin_module).__getattribute__(plugin_name)
+
         if "map_batches" in plugin.__name__:
-            dataset = dataset.map_batches(plugin)
+            dataset = dataset.map_batches(plugin, fn_kwargs=plugin_args, **map_args)
         elif "flat_map" in plugin.__name__:
-            dataset = dataset.flat_map(plugin)
+            dataset = dataset.flat_map(plugin, fn_kwargs=plugin_args, **map_args)
         else:
-            dataset = dataset.map(plugin)
+            dataset = dataset.map(plugin, fn_kwargs=plugin_args, **map_args)
 
-    output_writer(dataset, **output_writer_args)
+    dataset.__getattribute__(output_writer_name)(**writer_args)
+
 
 
 if __name__ == "__main__":

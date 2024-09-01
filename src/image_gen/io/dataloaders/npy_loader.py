@@ -3,14 +3,14 @@ import lightning.pytorch as pl
 import numpy as np
 import torch
 from filelock import FileLock
-from torch.utils.data import DataLoader, Dataset, random_split
+from torch.utils.data import DataLoader, IterableDataset, random_split
 
 from image_gen.constants.secret import s3_secrets
-from image_gen.io.source_loader_s3 import read_dir
+from image_gen.io.s3 import read_dir
 
 
-class customDataset(Dataset):
-    def __init__(self, loaded_data: dict, columns: tuple, test: bool):
+class customDataset(IterableDataset):
+    def __init__(self, metadata: dict, columns: tuple, test: bool):
         self.columns = columns
         self.test = test
         self.data = dict()
@@ -24,15 +24,18 @@ class customDataset(Dataset):
                 self.test_mask
             ]
 
-    def __len__(self):
-        return len(self.data[self.columns[0]])
-
-    def __getitem__(self, index):
-        sample = dict()
-        for column in self.columns:
-            sample[column] = torch.tensor(self.data[column][index])
-
-        return sample
+    def __iter__(self):
+        worker_info = torch.utils.data.get_worker_info()
+        if worker_info is None:  # single-process data loading, return the full iterator
+            iter_start = self.start
+            iter_end = self.end
+        else:  # in a worker process
+            # split workload
+            per_worker = int(math.ceil((self.end - self.start) / float(worker_info.num_workers)))
+            worker_id = worker_info.id
+            iter_start = self.start + worker_id * per_worker
+            iter_end = min(iter_start + per_worker, self.end)
+        return iter(range(iter_start, iter_end))
 
 
 class customDataModule(pl.LightningDataModule):
