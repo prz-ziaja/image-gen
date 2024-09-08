@@ -10,19 +10,9 @@ from image_gen.io.s3 import read_dir
 
 
 class customDataset(IterableDataset):
-    def __init__(self, metadata: dict, columns: tuple, test: bool):
+    def __init__(self, data: dict, columns: tuple):
         self.columns = columns
-        self.test = test
-        self.data = dict()
-
-        self.test_mask = (
-            np.concatenate([data["test"] for data in loaded_data]) == self.test
-        )
-
-        for column in self.columns:
-            self.data[column] = np.concatenate([data[column] for data in loaded_data])[
-                self.test_mask
-            ]
+        self.metadata = data
 
     def __iter__(self):
         worker_info = torch.utils.data.get_worker_info()

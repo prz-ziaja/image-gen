@@ -14,7 +14,10 @@ def main(dataset_module_name):
     source_loader_module, source_loader_name, source_loader_args = (
         dataset_module.source_loader
     )
-    _, output_writer_name, writer_args, _ = (
+    ray_source_connector_module, ray_source_connector_name, ray_source_connector_args = (
+        dataset_module.ray_source_connector
+    )
+    _, output_writer_name, writer_args = (
         dataset_module.output_writer
     )
 
@@ -22,8 +25,10 @@ def main(dataset_module_name):
     source_loader = importlib.import_module(source_loader_module).__getattribute__(
         source_loader_name
     )
+    ray_source_connector = importlib.import_module(ray_source_connector_module).__getattribute__(ray_source_connector_name)
 
-    dataset = ray.data.from_pandas(source_loader(**source_loader_args))
+    source_raw_data = source_loader(**source_loader_args)
+    dataset = ray_source_connector(dataset, **ray_source_connector_args)
 
     for plugin_module, plugin_name, plugin_args, map_args in dataset_module.plugins:
         plugin = importlib.import_module(plugin_module).__getattribute__(plugin_name)
