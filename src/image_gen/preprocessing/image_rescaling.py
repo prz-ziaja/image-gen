@@ -5,13 +5,13 @@ from pathlib import Path
 from image_gen.constants import DATA_LOCATIONS
 
 class ImageLoader_map_batches:
-    def __init__(self, fs, size):
-        assert fs in DATA_LOCATIONS, f"{fs} not supported - pick one of {DATA_LOCATIONS}"
+    def __init__(self, filesystem_name, image_size, **kwargs):
+        assert filesystem_name in DATA_LOCATIONS, f"{filesystem_name} not supported - pick one of {DATA_LOCATIONS}"
 
         self.to_tensor = tv.transforms.ToTensor()
-        self.rescaler = tv.transforms.Rescale(size)
+        self.rescaler = tv.transforms.Rescale(image_size)
 
-        if fs == "LOCAL_FS":
+        if filesystem_name == "LOCAL_FS":
             self.open = open
         else:
             raise Exception('S3 not supported for now')
@@ -27,7 +27,6 @@ class ImageLoader_map_batches:
         filenames = batch.pop(filename_key)
         is_train = batch['is_train']
         coco_path = Path(coco_path)
-        resizer = tv.transforms.Resize(size=size)
         
         images = list()
         for filename, training_sample in zip(filenames, is_train):
