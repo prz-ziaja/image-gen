@@ -1,6 +1,7 @@
 from image_gen.constants import plugin_spec, function_spec
 from image_gen.io.dataloaders.npy_loader import customDataModule
 
+dataloader_reader_module = "image_gen.io.local_fs"
 input_path = "/home/przemek/Desktop/image-gen/data"
 output_path = "/home/przemek/Desktop/image-gen/data/processed/"
 dataloader = customDataModule
@@ -29,7 +30,7 @@ plugins = (
         "SentenceEncoder_map_batches",
         {"text_key": "caption", "result_name": "encoded_sentence", "keep_source": False},
         {"SENETENCE_ENCODER_MODEL_NAME": "sentence-transformers/all-MiniLM-L6-v2"},
-        {"concurrency":1},
+        {"concurrency": 4},
     ),
 )
 

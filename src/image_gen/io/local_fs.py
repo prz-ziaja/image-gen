@@ -1,8 +1,10 @@
 import json
 from pathlib import Path
 import pandas as pd
+import os
+import numpy as np
 from image_gen.constants import DatasetRawKeys, DatasetTrainValKeys
-
+from image_gen.io.Reader import ReaderAbstract
 
 
 def read_metadata(coco_path:str):
@@ -30,3 +32,26 @@ def read_metadata(coco_path:str):
 
     # return full
     return val
+
+class Reader(ReaderAbstract):
+    def __init__(self):
+        pass
+
+    def read_metadata(self, dir_path):
+        dir_path = Path(dir_path)
+        npy_files = filter(lambda x: '.npy' == x[-4:], os.listdir(dir_path))
+        output = dict()
+        for npy_file in npy_files:
+            temp = np.load(str(dir_path/npy_file), allow_pickle=True).item()
+            for column in temp.keys():
+                output_column = output.get(column)
+                if output_column is None:
+                    output[column] = temp[column]
+                else:
+                    output[column] = np.concatenate([output_column, temp[column]])
+
+        return output
+
+
+    def read_image_file(self, file_path):
+        pass

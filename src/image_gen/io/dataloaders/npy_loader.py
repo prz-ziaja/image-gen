@@ -3,41 +3,37 @@ import lightning.pytorch as pl
 import numpy as np
 import torch
 from filelock import FileLock
-from torch.utils.data import DataLoader, IterableDataset, random_split
-
-from image_gen.constants.secret import s3_secrets
-from image_gen.io.s3 import read_dir
+from torch.utils.data import DataLoader, Dataset, random_split
+from importlib import import_module
 
 
-class customDataset(IterableDataset):
-    def __init__(self, data: dict, columns: tuple):
+class customDataset(Dataset):
+    def __init__(self, image_dir_path:str, data: dict, columns: tuple, reader, transform=None):
         self.columns = columns
         self.metadata = data
+        self.image_dir_path = image_dir_path
+        self.transform = transform
+        self.reader = reader
 
-    def __iter__(self):
-        worker_info = torch.utils.data.get_worker_info()
-        if worker_info is None:  # single-process data loading, return the full iterator
-            iter_start = self.start
-            iter_end = self.end
-        else:  # in a worker process
-            # split workload
-            per_worker = int(math.ceil((self.end - self.start) / float(worker_info.num_workers)))
-            worker_id = worker_info.id
-            iter_start = self.start + worker_id * per_worker
-            iter_end = min(iter_start + per_worker, self.end)
-        return iter(range(iter_start, iter_end))
+    def __len__(self):
+        return len(self.metadata)
 
+    def __getitem__(self, idx):
+
+        return None
 
 class customDataModule(pl.LightningDataModule):
-    def __init__(self, dataset_path: str, columns: tuple, batch_size=32):
+    def __init__(self, image_dir_path:str, metadata_path: str, columns: tuple, reading_class:str, batch_size=32):
         pl.LightningDataModule.__init__(self)
-        self.dataset_path = dataset_path
+        self.metadata_path = metadata_path
         self.columns = columns
         self.batch_size = batch_size
+        self.image_dir_path = image_dir_path
+        self.reader = import_module(reading_class).Reader()
 
     def setup(self, stage: str):
         torch.random.manual_seed(10)
-        loaded_data = read_dir(self.dataset_path)
+        loaded_data = self.Reader.read_metadata(self.metadata_path)
         if stage == "fit":
             train_val_ds = customDataset(loaded_data, self.columns, test=False)
             self.train_ds, self.val_ds = random_split(train_val_ds, [0.8, 0.2])
