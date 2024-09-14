@@ -29,17 +29,17 @@ def main(dataset_module_name):
     ray_source_connector = importlib.import_module(ray_source_connector_module).__getattribute__(ray_source_connector_name)
 
     source_raw_data = source_loader(**source_loader_args)
-    dataset = ray_source_connector(dataset, **ray_source_connector_args)
+    dataset = ray_source_connector(source_raw_data, **ray_source_connector_args)
 
-    for plugin_module, plugin_name, plugin_args, map_args in dataset_module.plugins:
+    for plugin_module, plugin_name, plugin_args, plugin_constructor_kwargs, map_args in dataset_module.plugins:
         plugin = importlib.import_module(plugin_module).__getattribute__(plugin_name)
 
         if "map_batches" in plugin.__name__:
-            dataset = dataset.map_batches(plugin, fn_kwargs=plugin_args, **map_args)
+            dataset = dataset.map_batches(plugin, fn_kwargs=plugin_args, fn_constructor_kwargs=plugin_constructor_kwargs, **map_args)
         elif "flat_map" in plugin.__name__:
-            dataset = dataset.flat_map(plugin, fn_kwargs=plugin_args, **map_args)
+            dataset = dataset.flat_map(plugin, fn_kwargs=plugin_args, fn_constructor_kwargs=plugin_constructor_kwargs, **map_args)
         else:
-            dataset = dataset.map(plugin, fn_kwargs=plugin_args, **map_args)
+            dataset = dataset.map(plugin, fn_kwargs=plugin_args, fn_constructor_kwargs=plugin_constructor_kwargs, **map_args)
 
     dataset.__getattribute__(output_writer_name)(**writer_args)
 

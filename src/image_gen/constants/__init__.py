@@ -1,8 +1,6 @@
 from collections import namedtuple
 from dataclasses import dataclass
 
-SENETENCE_ENCODER_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-
 function_spec = namedtuple("function_spec", ("module_name", "function_name", "fn_kwargs"))
 plugin_spec = namedtuple("plugin_spec", ("module_name", "plugin_name", "fn_kwargs", "fn_constructor_kwargs", "map_args"))
 

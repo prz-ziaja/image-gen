@@ -2,7 +2,7 @@ import numpy as np
 import ray
 
 from image_gen.io.utils import get_s3_fs
-from utils import function_builder
+
 
 
 def list_s3_dir(dir_path, fs, extension=""):

@@ -6,7 +6,7 @@ output_path = "/home/przemek/Desktop/image-gen/data/processed/"
 dataloader = customDataModule
 
 keys_to_save = [
-    "filename",
+    "file_name",
     "is_train",
     "encoded_sentence",
 ]
@@ -14,7 +14,7 @@ keys_to_save = [
 source_loader = function_spec(
     "image_gen.io.local_fs",
     "read_metadata",
-    {"dir_path": input_path},
+    {"coco_path": input_path},
 )
 
 ray_source_connector = function_spec(
@@ -27,14 +27,14 @@ plugins = (
     plugin_spec(
         "image_gen.preprocessing.sentence_embedding",
         "SentenceEncoder_map_batches",
-        {},
         {"text_key": "caption", "result_name": "encoded_sentence", "keep_source": False},
-        {},
+        {"SENETENCE_ENCODER_MODEL_NAME": "sentence-transformers/all-MiniLM-L6-v2"},
+        {"concurrency":1},
     ),
 )
 
 output_writer = function_spec(
     "",
     "write_numpy",
-    {"columns": keys_to_save, "dir_path": output_path}
+    {"column": keys_to_save, "path": output_path}
 )
