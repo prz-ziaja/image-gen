@@ -7,20 +7,7 @@ from sklearn.metrics import classification_report
 class Model(pl.LightningModule):
     def __init__(self, config):
         pl.LightningModule.__init__(self)
-        layer_1_size = config["layer_1_size"]
-        layer_2_size = config["layer_2_size"]
-        kernel_size = config["kernel_size"]
-        stride = config["stride"]
-        self.lr = config["lr"]
-
-        self.c1 = nn.Conv2d(3, layer_1_size, kernel_size, stride)
-        self.c2 = nn.Conv2d(layer_1_size, layer_2_size, kernel_size, stride)
-        self.c3 = nn.Conv2d(layer_2_size, 64, kernel_size, stride)
-        self.d = nn.Dropout(0.1)
-
-        self.act = nn.SELU()
-        self.l1 = nn.Linear(576, 128)
-        self.l2 = nn.Linear(128, 10)
+        self.model = timm.create_model(**config)
 
         self.eval_loss = []
         self.eval_preds = []
@@ -40,16 +27,7 @@ class Model(pl.LightningModule):
         x = self.fc3(x)
         return x"""
 
-        x = self.act(self.c1(x))
-        x = self.act(self.c2(x))
-        x = self.d(x)
-        x = self.act(self.c3(x))
-        x = self.d(x)
-
-        x = x.flatten(start_dim=1)
-        x = self.act(self.l1(x))
-        x = self.d(x)
-        x = self.l2(x)
+        x = self.model(x)
 
         return x
 

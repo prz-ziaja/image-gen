@@ -3,15 +3,16 @@ import torch.nn as nn
 from image_gen.constants import plugin_spec, function_spec
 
 IMAGE_SIZE = (128, 128)
+DATASET_NAME = "image_gen.io.datasets.coca_001"
 
 preprocessing = {
-    "dataset_name": "hsv_ds_00",
+    "dataset_name": DATASET_NAME,
 }
 
 training = {
     "max_num_epochs": 4,
     "max_num_samples": 10,
-    "model_name": "simple_cnn_arch",
+    "model_name": "image_gen.models.simple_cnn_arch",
     "experiment_name": "generator",
     "scaling_config": {
         "num_workers": 1,
@@ -24,9 +25,7 @@ training = {
         "columns": ("hsv", "labels"),
     },
     "dataloader_args":{
-        "transforms": [
-            plugin_spec("image_gen.preprocessing.image_rescaling", "ImageLoader_map_batches", {"filesystem_name": "LOCAL_FS", "image_size": IMAGE_SIZE}, {}, {})
-        ],
+        "dataset_name": DATASET_NAME,
     },
     "hparams": {
         "layer_1_size": tune.qrandint(8, 24),

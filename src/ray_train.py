@@ -27,16 +27,16 @@ def build_train_func(model_module, data_module, data_location, experiment_name):
         )
         model = model_module.Model(config)
 
-        setup_mlflow(
-           config,
-           experiment_name=experiment_name,
-           #ctx.get_experiment_name()   ctx.get_local_world_size()  ctx.get_node_rank()         ctx.get_trial_dir()         ctx.get_trial_name()        ctx.get_world_rank()
-           #ctx.get_local_rank()        ctx.get_metadata()          ctx.get_storage()           ctx.get_trial_id()          ctx.get_trial_resources()   ctx.get_world_size()
-           run_name=train.get_context().get_trial_name(),
-           tracking_uri="http://127.0.0.1:5000",
-           #tags={"trial_dir":train.get_context().get_trial_dir()}
-        )
-        mlflow.pytorch.autolog()
+        # setup_mlflow(
+        #    config,
+        #    experiment_name=experiment_name,
+        #    #ctx.get_experiment_name()   ctx.get_local_world_size()  ctx.get_node_rank()         ctx.get_trial_dir()         ctx.get_trial_name()        ctx.get_world_rank()
+        #    #ctx.get_local_rank()        ctx.get_metadata()          ctx.get_storage()           ctx.get_trial_id()          ctx.get_trial_resources()   ctx.get_world_size()
+        #    run_name=train.get_context().get_trial_name(),
+        #    tracking_uri="http://127.0.0.1:5000",
+        #    #tags={"trial_dir":train.get_context().get_trial_dir()}
+        # )
+        # mlflow.pytorch.autolog()
 
         trainer = pl.Trainer(
             devices="auto",
@@ -76,8 +76,8 @@ def main(module_name):
     scaling_config = pipeline_config_module.training["scaling_config"]
     experiment_name = pipeline_config_module.training["experiment_name"]
 
-    model_module = importlib.import_module(f"image_gen.models.{model_name}")
-    dataset_module = importlib.import_module(f"image_gen.io.datasets.{dataset_name}")
+    model_module = importlib.import_module(model_name)
+    dataset_module = importlib.import_module(dataset_name)
 
     data_location = dataset_module.output_path
     #mlflow.set_tracking_uri("http://127.0.0.1:5000")

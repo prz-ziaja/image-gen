@@ -7,6 +7,8 @@ from image_gen.constants import DatasetRawKeys, DatasetTrainValKeys
 from image_gen.io.Reader import ReaderAbstract
 
 
+import torch
+
 def read_metadata(coco_path:str):
     coco_path = Path(coco_path)
 
@@ -54,4 +56,4 @@ class Reader(ReaderAbstract):
 
 
     def read_image_file(self, file_path):
-        pass
+        return torch.random(3,2,2)

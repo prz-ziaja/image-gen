@@ -5,6 +5,10 @@ dataloader_reader_module = "image_gen.io.local_fs"
 input_path = "/home/przemek/Desktop/image-gen/data"
 output_path = "/home/przemek/Desktop/image-gen/data/processed/"
 dataloader = customDataModule
+metadata_path = output_path
+image_dir_path = input_path
+
+transforms = None
 
 keys_to_save = [
     "file_name",
