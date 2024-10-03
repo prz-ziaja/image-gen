@@ -12,5 +12,5 @@ class ReaderAbstract(ABC):
         pass
 
     @abstractmethod
-    def read_image_file(self, path):
+    def read_image(self, path):
         pass

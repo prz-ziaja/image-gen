@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 import os
 import numpy as np
+import cv2
 from image_gen.constants import DatasetRawKeys, DatasetTrainValKeys
 from image_gen.io.Reader import ReaderAbstract
 
@@ -55,5 +56,7 @@ class Reader(ReaderAbstract):
         return output
 
 
-    def read_image_file(self, file_path):
-        return torch.random(3,2,2)
+    def read_image(self, file_path:str) -> np.ndarray:
+        image_bgr = cv2.imread(file_path)
+        image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+        return image_rgb
