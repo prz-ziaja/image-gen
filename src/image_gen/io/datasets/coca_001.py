@@ -3,9 +3,12 @@ from image_gen.io.dataloaders.npy_loader import customDataModule
 from torchvision.transforms import v2
 import torch
 
-dataloader_reader_module = "image_gen.io.local_fs"
-input_path = "/home/przemek/Desktop/image-gen/data"
-output_path = "/home/przemek/Desktop/image-gen/data/processed/"
+# dataloader_reader_module = "image_gen.io.local_fs"
+# input_path = "/home/przemek/Desktop/image-gen/data"
+# output_path = "/home/przemek/Desktop/image-gen/data/processed/"
+dataloader_reader_module = "image_gen.io.s3"
+input_path = "s3://ray/coco-2017"
+output_path = "s3://ray/coco-2017/processed/"
 dataloader = customDataModule
 metadata_path = output_path
 image_dir_path = input_path
@@ -13,9 +16,9 @@ image_dir_path = input_path
 transform = v2.Compose([
     v2.ToImage(),
     v2.ToDtype(torch.float32),
-    v2.Resize(128),
-    v2.RandomCrop((128,128)),
-    v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    v2.Resize(64),
+    v2.RandomCrop((64,64)),
+    v2.Normalize(mean=[123.68, 116.28, 103.53], std=[58.4, 57.12, 57.38]),
 ])
 
 keys_to_save = [
