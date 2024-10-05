@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 import pandas as pd
 import os
 import numpy as np
@@ -10,21 +9,25 @@ from image_gen.io.utils import get_s3_fs
 
 
 def read_metadata(coco_path:str):
-    coco_path = Path(coco_path)
     fs = get_s3_fs()
 
-    with fs.open(coco_path / "raw" / "captions_val2017.json", 'r') as f:
+    print('open val captions')
+    with fs.open(coco_path + "/raw/captions_val2017.json", 'r') as f:
         val_captions = pd.DataFrame(json.load(f)[DatasetRawKeys.ANNOTATIONS])
 
-    with fs.open(coco_path / "raw" / "captions_train2017.json", 'r') as f:
+    print('open train captions')
+    with fs.open(coco_path + "/raw/captions_train2017.json", 'r') as f:
         train_captions = pd.DataFrame(json.load(f)[DatasetRawKeys.ANNOTATIONS])
 
-    with fs.open(coco_path / "validation" / "labels.json", 'r') as f:
+    print('open val labels')
+    with fs.open(coco_path + "/validation/labels.json", 'r') as f:
         val_labels = pd.DataFrame(json.load(f)[DatasetTrainValKeys.IMAGES])
 
-    with fs.open(coco_path / "train" / "labels.json", 'r') as f:
+    print('open train labels')
+    with fs.open(coco_path + "/train/labels.json", 'r') as f:
         train_labels = pd.DataFrame(json.load(f)[DatasetTrainValKeys.IMAGES])
 
+    print('merge')
     train = pd.merge(train_labels,train_captions,left_on='id', right_on='image_id')
     train['is_train'] = True
 
@@ -32,6 +35,7 @@ def read_metadata(coco_path:str):
     val['is_train'] = False
 
     full = pd.concat([train, val], axis=0)
+    print('all done')
 
     return full
 
@@ -41,11 +45,10 @@ class Reader(ReaderAbstract):
         self.fs = get_s3_fs()
 
     def read_metadata(self, dir_path):
-        dir_path = Path(dir_path)
         npy_files = filter(lambda x: '.npy' == x[-4:], self.fs.ls(dir_path))
         output = dict()
         for npy_file in npy_files:
-            with self.fs.open(str(dir_path/npy_file)) as f:
+            with self.fs.open(str(dir_path + "/" + npy_file)) as f:
                 temp = np.load(f, allow_pickle=True).item()
             for column in temp.keys():
                 output_column = output.get(column)
