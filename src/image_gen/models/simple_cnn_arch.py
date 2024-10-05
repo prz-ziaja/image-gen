@@ -32,6 +32,7 @@ class Model(pl.LightningModule):
         return x
 
     def training_step(self, train_batch, batch_idx):
+        return 1.0
         x, y = train_batch["hsv"], train_batch["labels"].flatten().long()
         logits = self.forward(x)
         loss = self.compute_loss(logits, y)
@@ -40,6 +41,7 @@ class Model(pl.LightningModule):
         return loss
 
     def validation_step(self, val_batch, batch_idx):
+        return
         x, y = val_batch["hsv"], val_batch["labels"].flatten().long()
 
         logits = self.forward(x)
@@ -51,6 +53,7 @@ class Model(pl.LightningModule):
         
 
     def on_validation_epoch_end(self):
+        return
         avg_loss = torch.stack(self.eval_loss).cpu().mean()
         self.log("val_loss", avg_loss, sync_dist=True)
         self.eval_loss.clear()
