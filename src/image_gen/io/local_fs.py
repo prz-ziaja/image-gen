@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 import os
 import numpy as np
-import cv2
+from PIL import Image
 from image_gen.constants import DatasetRawKeys, DatasetTrainValKeys
 from image_gen.io.Reader import ReaderAbstract
 
@@ -55,6 +55,7 @@ class Reader(ReaderAbstract):
 
 
     def read_image(self, file_path:str) -> np.ndarray:
-        image_bgr = cv2.imread(file_path)
-        image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
-        return image_rgb
+        with open(file_path) as f:
+            im = np.array(Image.open(f))
+
+        return im

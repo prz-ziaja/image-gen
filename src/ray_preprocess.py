@@ -45,7 +45,6 @@ def main(dataset_module_name):
     dataset.__getattribute__(output_writer_name)(**writer_args)
 
 
-
 if __name__ == "__main__":
     args = u.parse_args()
     u.ray_connect(args)

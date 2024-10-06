@@ -4,12 +4,13 @@ from image_gen.io.utils import get_s3_fs_pa
 from torchvision.transforms import v2
 import torch
 
-# dataloader_reader_module = "image_gen.io.local_fs"
-# input_path = "/home/przemek/Desktop/image-gen/data"
-# output_path = "/home/przemek/Desktop/image-gen/data/processed/"
-dataloader_reader_module = "image_gen.io.s3"
-input_path = "s3://ray/coco-2017"
-output_path = "s3://ray/coco-2017/processed/"
+dataloader_reader_module = "image_gen.io.local_fs"
+input_path = "/home/przemek/Desktop/image-gen/data"
+output_path = "/home/przemek/Desktop/image-gen/data/processed/"
+# in case of s3
+# dataloader_reader_module = "image_gen.io.s3"
+# input_path = "s3://ray/coco-2017"
+# output_path = "s3://ray/coco-2017/processed/"
 dataloader = customDataModule
 metadata_path = output_path
 image_dir_path = input_path
@@ -29,7 +30,9 @@ keys_to_save = [
 ]
 
 source_loader = function_spec(
-    "image_gen.io.s3",
+    "image_gen.io.local_fs",
+    # in case of s3
+    # "image_gen.io.s3",
     "read_metadata",
     {"coco_path": input_path},
 )
@@ -53,5 +56,10 @@ plugins = (
 output_writer = function_spec(
     "",
     "write_numpy",
-    {"column": keys_to_save, "path": output_path, "filesystem": get_s3_fs_pa()}
+    {
+        "column": keys_to_save,
+        "path": output_path,
+        # in case of s3
+        # "filesystem": get_s3_fs_pa()
+    }
 )
