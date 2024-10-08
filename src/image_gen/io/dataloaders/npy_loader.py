@@ -34,12 +34,12 @@ class customDataset(Dataset):
     def __getitem__(self, idx):
         file_name = self.metadata['file_name'][idx]
         subdir = "train" if self.metadata['is_train'][idx] else "validation"
-        loaded_image = self.reader.read_image(self.image_dir_path / subdir / "data" / file_name)
+        loaded_image = self.reader.read_image(str(self.image_dir_path / subdir / "data" / file_name))
         image = self.transform(loaded_image) if self.transform is not None else loaded_image
-        return {'image': image} | {k:self.metadata[k] for k in self.columns}
+        return {k:self.metadata.get(k, None) for k in self.columns} | {'image': image}
 
 class customDataModule(pl.LightningDataModule):
-    def __init__(self, dataset_name: str, reading_class:str, columns: tuple, batch_size=32):
+    def __init__(self, dataset_name: str, reading_class:str, columns: tuple=None, batch_size=512, **kwargs):
         pl.LightningDataModule.__init__(self)
 
         dataset = import_module(dataset_name)

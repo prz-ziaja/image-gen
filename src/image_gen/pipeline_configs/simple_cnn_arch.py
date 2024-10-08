@@ -10,30 +10,31 @@ preprocessing = {
 }
 
 training = {
-    "max_num_epochs": 4,
-    "max_num_samples": 10,
+    "max_num_epochs": 10,
+    "max_num_samples": 1,
     "model_name": "image_gen.models.simple_cnn_arch",
-    "experiment_name": "generator",
+    "experiment_name": "Default",#"generator",
     "scaling_config": {
         "num_workers": 1,
         #"resources_per_worker": {"CPU": 3},
         "resources_per_worker": {"GPU": 0.4},
         "use_gpu": True,
     },
-    "dataloader_hparams_shared":{
+    "data_module_hparams_shared":{
         "image_size": IMAGE_SIZE,
-        "columns": ("hsv", "labels"),
+        "columns": ("image", ),#"encoded_sentence"),
+        "batch_size": 128,
     },
-    "dataloader_args":{
+    "data_module_kwargs":{
         "dataset_name": DATASET_NAME,
+        "reading_class": "image_gen.io.local_fs",
     },
     "hparams": {
         "layer_1_size": tune.qrandint(8, 24),
         "layer_2_size": tune.qrandint(32, 56),
-        "lr": tune.qloguniform(1e-4, 1e-2, 1e-5),
+        "lr": 0.0001,#tune.qloguniform(1e-4, 1e-2, 1e-5),
         "kernel_size": 3,
         "stride": 2,
-        "batch_size": 128,
         "loss_function": tune.choice([nn.CrossEntropyLoss(), nn.MultiMarginLoss()])
     },
 }

@@ -19,14 +19,9 @@ from ray.tune.schedulers import ASHAScheduler
 import utils as u
 
 
-def build_train_func(model_module, data_module, dataset_name, experiment_name):
+def build_train_func(model_module, data_module, data_module_args, experiment_name):
     def train_func(config):
-        dm = data_module(
-            dataset_name=dataset_name,
-            # FIXME
-            # columns=config["dataloader_hparams_shared"]["columns"],
-            # batch_size=config["batch_size"],
-        )
+        dm = data_module(**data_module_args)
         model = model_module.Model(config)
 
         smlf = setup_mlflow(
@@ -79,6 +74,10 @@ def main(module_name):
     model_hparams = pipeline_config_module.training["hparams"]
     scaling_config = pipeline_config_module.training["scaling_config"]
     experiment_name = pipeline_config_module.training["experiment_name"]
+    data_module_args = (
+        pipeline_config_module.training["data_module_hparams_shared"] 
+        | pipeline_config_module.training["data_module_kwargs"] 
+    )
 
     model_module = importlib.import_module(model_name)
     dataset_module = importlib.import_module(dataset_name)
@@ -88,7 +87,7 @@ def main(module_name):
     #mlflow.set_experiment(model_name)
 
     train_func = build_train_func(
-        model_module, dataset_module.dataloader, dataset_name, experiment_name=experiment_name
+        model_module, dataset_module.dataloader, data_module_args, experiment_name=experiment_name
     )
 
     # The maximum training epochs
