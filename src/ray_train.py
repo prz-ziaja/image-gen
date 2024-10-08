@@ -12,39 +12,43 @@ from ray.train.lightning import (
     RayTrainReportCallback,
     prepare_trainer,
 )
+from lightning.pytorch.loggers import MLFlowLogger
 from ray.train.torch import TorchConfig, TorchTrainer
 from ray.tune.schedulers import ASHAScheduler
 
 import utils as u
 
 
-def build_train_func(model_module, data_module, data_location, experiment_name):
+def build_train_func(model_module, data_module, dataset_name, experiment_name):
     def train_func(config):
         dm = data_module(
-            dataset_path=data_location,
-            columns=config["columns"],
-            batch_size=config["batch_size"],
+            dataset_name=dataset_name,
+            # FIXME
+            # columns=config["dataloader_hparams_shared"]["columns"],
+            # batch_size=config["batch_size"],
         )
         model = model_module.Model(config)
 
-        # setup_mlflow(
-        #    config,
-        #    experiment_name=experiment_name,
-        #    #ctx.get_experiment_name()   ctx.get_local_world_size()  ctx.get_node_rank()         ctx.get_trial_dir()         ctx.get_trial_name()        ctx.get_world_rank()
-        #    #ctx.get_local_rank()        ctx.get_metadata()          ctx.get_storage()           ctx.get_trial_id()          ctx.get_trial_resources()   ctx.get_world_size()
-        #    run_name=train.get_context().get_trial_name(),
-        #    tracking_uri="http://127.0.0.1:5000",
-        #    #tags={"trial_dir":train.get_context().get_trial_dir()}
-        # )
-        # mlflow.pytorch.autolog()
+        smlf = setup_mlflow(
+           config,
+           experiment_name=experiment_name,
+           #ctx.get_experiment_name()   ctx.get_local_world_size()  ctx.get_node_rank()         ctx.get_trial_dir()         ctx.get_trial_name()        ctx.get_world_rank()
+           #ctx.get_local_rank()        ctx.get_metadata()          ctx.get_storage()           ctx.get_trial_id()          ctx.get_trial_resources()   ctx.get_world_size()
+           run_name=train.get_context().get_trial_name(),
+           tracking_uri="http://127.0.0.1:5000",
+           #tags={"trial_dir":train.get_context().get_trial_dir()}
+        )
 
+        mlflow.pytorch.autolog()
+        mlf_logger = MLFlowLogger(run_id=smlf.active_run().info.run_id, experiment_name="Default", tracking_uri="http://127.0.0.1:5000")
         trainer = pl.Trainer(
             devices="auto",
             accelerator="auto",
             strategy=RayDDPStrategy(),
             callbacks=[RayTrainReportCallback()],
             plugins=[RayLightningEnvironment()],
-            enable_progress_bar=False,
+            enable_progress_bar=True,
+            logger=mlf_logger,
         )
         trainer = prepare_trainer(trainer)
         trainer.fit(model, datamodule=dm)
@@ -59,7 +63,7 @@ def tune_hms_asha(ray_trainer, search_space, num_epochs, num_samples=10):
         ray_trainer,
         param_space={"train_loop_config": search_space},
         tune_config=tune.TuneConfig(
-            metric="val_neg_f1",
+            metric="train_loss",
             mode="min",
             num_samples=num_samples,
             scheduler=scheduler,
@@ -84,7 +88,7 @@ def main(module_name):
     #mlflow.set_experiment(model_name)
 
     train_func = build_train_func(
-        model_module, dataset_module.dataloader, data_location, experiment_name=experiment_name
+        model_module, dataset_module.dataloader, dataset_name, experiment_name=experiment_name
     )
 
     # The maximum training epochs
@@ -98,7 +102,7 @@ def main(module_name):
     run_config = RunConfig(
         checkpoint_config=CheckpointConfig(
             num_to_keep=2,
-            checkpoint_score_attribute="val_neg_f1",
+            checkpoint_score_attribute="train_loss",
             checkpoint_score_order="min",
         ),
     )

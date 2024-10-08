@@ -55,7 +55,6 @@ class Reader(ReaderAbstract):
 
 
     def read_image(self, file_path:str) -> np.ndarray:
-        with open(file_path) as f:
-            im = np.array(Image.open(f))
+        im = np.array(Image.open(file_path))
 
         return im
