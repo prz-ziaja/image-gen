@@ -27,6 +27,9 @@ class customDataset(Dataset):
         dataset = import_module(dataset_name)
         self.transform = dataset.transform
         self.reader = import_module(reading_class).Reader()
+        for column in columns:
+            if column not in self.metadata and column != "image":
+                raise Exception(f"Column {column} not present in metadata. Please remove column or add column to metadata dataset.")
 
     def __len__(self):
         return len(self.metadata['file_name'])
