@@ -31,7 +31,9 @@ training = {
     },
     "hparams": {
         "lr": 0.0001,#tune.qloguniform(1e-4, 1e-2, 1e-5),
-        "T": 20,
+        "T": 60,
+        "t_start": 6e-4,
+        "t_end": 8e-2,
         "loss_function": tune.choice([nn.MSELoss(),])
     },
 }

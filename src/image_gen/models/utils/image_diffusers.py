@@ -5,16 +5,14 @@ class imageDiffuser(nn.Module):
     """
     The class aims to produce noisy images for stable diffusion model.
     """
-    def __init__(self, T:int):
+    def __init__(self, T:int, t_start:float = 1e-4, t_end:float = 2e-2):
         """
         T - max timestamp - maximum number steps during there is added noise.
         """
         nn.Module.__init__(self)
         self.T = T
 
-        start = 1e-3
-        end = 2e-1
-        noise_schedule= torch.linspace(start, end, T)
+        noise_schedule= torch.linspace(t_start, t_end, T)
         image_schedule = 1.0 - noise_schedule
 
         cumprod_image_sch = torch.cumprod(image_schedule, dim=0)
