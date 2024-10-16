@@ -2,7 +2,7 @@ from ray import tune
 import torch.nn as nn
 from image_gen.constants import plugin_spec, function_spec
 
-IMAGE_SIZE = (128, 128)
+IMAGE_SIZE = (64, 64)
 DATASET_NAME = "image_gen.io.datasets.coca_001"
 
 preprocessing = {
@@ -30,11 +30,8 @@ training = {
         "reading_class": "image_gen.io.local_fs",
     },
     "hparams": {
-        "layer_1_size": tune.qrandint(8, 24),
-        "layer_2_size": tune.qrandint(32, 56),
         "lr": 0.0001,#tune.qloguniform(1e-4, 1e-2, 1e-5),
-        "kernel_size": 3,
-        "stride": 2,
-        "loss_function": tune.choice([nn.CrossEntropyLoss(), nn.MultiMarginLoss()])
+        "T": 20,
+        "loss_function": tune.choice([nn.MSELoss(),])
     },
 }

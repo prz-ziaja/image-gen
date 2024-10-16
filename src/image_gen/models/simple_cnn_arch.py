@@ -9,27 +9,27 @@ import image_gen.models.utils.blocks as blocks
 import image_gen.models.utils.embeddings as embeddings
 import image_gen.models.utils.image_diffusers as image_diffusers
 
+import mlflow
 
-
-def show_tensor_image(image):
-    reverse_transforms = transforms.Compose([
-        transforms.Lambda(lambda t: (t + 1) / 2),
+def temp_vis(image):
+    # TODO: rewrite this
+    reverse_dataset_preprocessing = transforms.Compose([
+        transforms.Lambda(lambda t: (torch.tensor([58.4, 57.12, 57.38]).reshape([3,1,1])*t + torch.tensor([123.68, 116.28, 103.53]).reshape([3,1,1]))/255),
         transforms.Lambda(lambda t: torch.minimum(torch.tensor([1]), t)),
         transforms.Lambda(lambda t: torch.maximum(torch.tensor([0]), t)),
         transforms.ToPILImage(),
     ])
-    plt.imshow(reverse_transforms(image[0].detach().cpu()))
+    plt.imshow(reverse_dataset_preprocessing(image[0].detach().cpu()))
 
 class Model(pl.LightningModule):
     def __init__(self, config):
         pl.LightningModule.__init__(self)
         IMG_CH = 3
-        IMG_SIZE = 64
-        down_chs = (16, 32, 64)
+        IMG_SIZE = config["image_size"][0]
+        down_chs = (32, 64, 128)
         up_chs = down_chs[::-1]  # Reverse of the down channels
         latent_image_size = IMG_SIZE // 4 # 2 ** (len(down_chs) - 1)
         self.config = config
-        self.config["T"] = 20
 
         self.image_diffuser = image_diffusers.imageDiffuser(config["T"])
         self.time_embedding_0 = embeddings.embedBlock(1, [16, up_chs[0]])
@@ -63,19 +63,17 @@ class Model(pl.LightningModule):
 
         print(f"Device: {self.device}")
         self.lr = config["lr"]
-        #self.loss_function = config["loss_function"]#nn.CrossEntropyLoss()#HingeEmbeddingLoss()
+        self.loss_function = config["loss_function"]
 
     def compute_loss(self, imgs, imgs_pred):
-        return F.mse_loss(imgs, imgs_pred)
+        return self.loss_function(imgs, imgs_pred)
 
     def forward(self, x, t:int):
         x = self._down(x)
-        print(x.shape)
         down0 = self.down1(x)
-        print(down0.shape)
         down1 = self.down2(down0)
         latent_vec = self.to_vec(down1)
-        
+
         latent_vec = self.dense_emb(latent_vec)
         t = t.float() / self.config["T"]  # Convert from [0, T] to [0, 1]
         temb_1 = self.time_embedding_0(t)
@@ -93,41 +91,51 @@ class Model(pl.LightningModule):
 
     #     print("on_before_opt exit")
     def training_step(self, train_batch, batch_idx):
+
         self.last_batch = train_batch["image"]
+
         x = train_batch["image"].to(self.device)
-        imgs_noisy = add_noise(x)
-        preds = self.forward(imgs_noisy)
-        loss = self.compute_loss(x, preds)
+        t = torch.randint(0, self.config["T"], (x.shape[0],1), device=self.device)
+
+        imgs_noisy, noise = self.image_diffuser(x, t)
+        preds = self.forward(imgs_noisy, t)
+        loss = self.compute_loss(noise, preds)
 
         self.log("train_loss", loss.detach().cpu().item())
-        print(f"Recent loss: {loss.detach().cpu().item():.5f}", end="\r")
+        # print(f"Recent loss: {loss.detach().cpu().item():.5f}", end="\r")
         if batch_idx % 25 == 0:
             self.on_train_epoch_end()
         return loss
 
     def on_train_epoch_end(self):
         filename = self.plot_sample(self.last_batch)
-        run_id = self.logger.run_id
-        self.logger.experiment.log_artifact(run_id=run_id, local_path=filename)
+        mlflow.log_artifact(filename)
 
     @torch.no_grad()
     def plot_sample(self, imgs):
         # Take first image of batch
         imgs = imgs[[0], :, :, :]
-        imgs_noisy = add_noise(imgs[[0], :, :, :])
-        imgs_pred = self.forward(imgs_noisy)
+        img, _ = self.image_diffuser(imgs[[0], :, :, :],19)
+        org = torch.clone(img)
+        for i in range(19, -1,-1):
+            _t = torch.tensor([[i]],device=img.device)
+            img = self.image_diffuser.reverse(img, self.forward(img, _t),_t)
+            
+            if i == 10:
+                halfway = torch.clone(img)
 
-        nrows = 1
-        ncols = 3
+        nrows = 2
+        ncols = 2
         samples = {
             "Original" : imgs,
-            "Noise Added" : imgs_noisy,
-            "Predicted Original" : imgs_pred
+            "At the beginning": org,
+            "Halfway" : halfway,
+            "Predicted Original" : img
         }
         for i, (title, img) in enumerate(samples.items()):
             ax = plt.subplot(nrows, ncols, i+1)
             ax.set_title(title)
-            show_tensor_image(img)
+            temp_vis(img)
 
         filename = f"/tmp/{int(time.time())}.png"
         plt.savefig(filename)
@@ -147,6 +155,7 @@ class Model(pl.LightningModule):
         
 
     def on_validation_epoch_end(self):
+        mlflow.pytorch.log_model(self, f"{int(time.time())}.pt")
         return
         avg_loss = torch.stack(self.eval_loss).cpu().mean()
         self.log("val_loss", avg_loss, sync_dist=True)

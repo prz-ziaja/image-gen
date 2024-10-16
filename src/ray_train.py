@@ -69,12 +69,15 @@ def main(module_name):
     pipeline_config_module = importlib.import_module(module_name)
     model_name = pipeline_config_module.training["model_name"]
     dataset_name = pipeline_config_module.preprocessing["dataset_name"]
-    model_hparams = pipeline_config_module.training["hparams"]
     scaling_config = pipeline_config_module.training["scaling_config"]
     experiment_name = pipeline_config_module.training["experiment_name"]
     data_module_args = (
         pipeline_config_module.training["data_module_hparams_shared"] 
         | pipeline_config_module.training["data_module_kwargs"] 
+    )
+    model_params = (
+        pipeline_config_module.training["data_module_hparams_shared"]
+        | pipeline_config_module.training["hparams"]
     )
 
     model_module = importlib.import_module(model_name)
@@ -110,7 +113,7 @@ def main(module_name):
         torch_config=TorchConfig(backend="gloo"),
     )
     results = tune_hms_asha(
-        ray_trainer, model_hparams, num_epochs, num_samples=num_samples
+        ray_trainer, model_params, num_epochs, num_samples=num_samples
     )
     return results
 
