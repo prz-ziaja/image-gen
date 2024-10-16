@@ -12,8 +12,8 @@ class imageDiffuser(nn.Module):
         nn.Module.__init__(self)
         self.T = T
 
-        start = 1e-4
-        end = 2e-2
+        start = 1e-3
+        end = 2e-1
         noise_schedule= torch.linspace(start, end, T)
         image_schedule = 1.0 - noise_schedule
 
