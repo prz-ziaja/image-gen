@@ -35,6 +35,7 @@ def build_train_func(model_module, data_module, data_module_args, experiment_nam
         )
 
         mlflow.pytorch.autolog()
+        mlf_logger = MLFlowLogger(run_id=smlf.active_run().info.run_id, experiment_name="Default", tracking_uri="http://127.0.0.1:5000")
         trainer = pl.Trainer(
             devices="auto",
             accelerator="auto",
@@ -42,6 +43,7 @@ def build_train_func(model_module, data_module, data_module_args, experiment_nam
             callbacks=[RayTrainReportCallback()],
             plugins=[RayLightningEnvironment()],
             enable_progress_bar=True,
+            logger=mlf_logger,
         )
         trainer = prepare_trainer(trainer)
         trainer.fit(model, datamodule=dm)
