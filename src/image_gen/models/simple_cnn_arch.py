@@ -26,14 +26,16 @@ class Model(pl.LightningModule):
         pl.LightningModule.__init__(self)
         IMG_CH = 3
         IMG_SIZE = config["image_size"][0]
-        down_chs = (32, 64, 128)
+        down_chs = (64, 128, 128, 256, 256)
         up_chs = down_chs[::-1]  # Reverse of the down channels
-        latent_image_size = IMG_SIZE // 4 # 2 ** (len(down_chs) - 1)
+        latent_image_size = IMG_SIZE // 16 # 2 ** (len(down_chs) - 1)
         self.config = config
 
-        self.image_diffuser = image_diffusers.imageDiffuser(config["T"])
+        self.image_diffuser = image_diffusers.imageDiffuser(config["T"], config["t_start"], config["t_end"])
         self.time_embedding_0 = embeddings.embedBlock(1, [16, up_chs[0]])
         self.time_embedding_1 = embeddings.embedBlock(1, [16, up_chs[1]])
+        self.time_embedding_2 = embeddings.embedBlock(1, [16, up_chs[2]])
+        self.time_embedding_3 = embeddings.embedBlock(1, [16, up_chs[3]])
 
         self._down = blocks.geluConv2d(IMG_CH, down_chs[0], stride=1)
         self._up = blocks.geluConv2d(up_chs[-1]*2, IMG_CH, stride=1)
@@ -41,15 +43,17 @@ class Model(pl.LightningModule):
         # Downsample
         self.down1 = blocks.downBlock2d(down_chs[0], down_chs[1], group_size=8) # New
         self.down2 = blocks.downBlock2d(down_chs[1], down_chs[2], group_size=8) # New
+        self.down3 = blocks.downBlock2d(down_chs[2], down_chs[3], group_size=8) # New
+        self.down4 = blocks.downBlock2d(down_chs[4], down_chs[4], group_size=8) # New
         self.to_vec = nn.Sequential(nn.Flatten(), nn.GELU())
 
         # Embeddings
         self.dense_emb = nn.Sequential(
-            nn.Linear(down_chs[2]*latent_image_size**2, down_chs[1]),
+            nn.Linear(down_chs[-1]*latent_image_size**2, down_chs[-2]),
             nn.ReLU(),
-            nn.Linear(down_chs[1], down_chs[1]),
+            nn.Linear(down_chs[-2], down_chs[-2]),
             nn.ReLU(),
-            nn.Linear(down_chs[1], down_chs[2]*latent_image_size**2),
+            nn.Linear(down_chs[-2], down_chs[-1]*latent_image_size**2),
             nn.ReLU()
         )
 
@@ -58,8 +62,10 @@ class Model(pl.LightningModule):
             nn.Unflatten(1, (up_chs[0], latent_image_size, latent_image_size)),
             blocks.geluConv2d(up_chs[0], up_chs[0], num_groups=8) # New
         )
-        self.up1 = blocks.upBlock2d(up_chs[0], up_chs[1], 8) # New
-        self.up2 = blocks.upBlock2d(up_chs[1], up_chs[2], 8) # New
+        self.up1 = blocks.upBlock2dWithSkip(up_chs[0], up_chs[1], 8) # New
+        self.up2 = blocks.upBlock2dWithSkip(up_chs[1], up_chs[2], 8) # New
+        self.up3 = blocks.upBlock2dWithSkip(up_chs[2], up_chs[3], 8) # New
+        self.up4 = blocks.upBlock2dWithSkip(up_chs[3], up_chs[4], 8) # New
 
         print(f"Device: {self.device}")
         self.lr = config["lr"]
@@ -70,19 +76,25 @@ class Model(pl.LightningModule):
 
     def forward(self, x, t:int):
         x = self._down(x)
-        down0 = self.down1(x)
-        down1 = self.down2(down0)
-        latent_vec = self.to_vec(down1)
+        down1 = self.down1(x)
+        down2 = self.down2(down1)
+        down3 = self.down3(down2)
+        down4 = self.down4(down3)
+        latent_vec = self.to_vec(down4)
 
         latent_vec = self.dense_emb(latent_vec)
         t = t.float() / self.config["T"]  # Convert from [0, T] to [0, 1]
         temb_1 = self.time_embedding_0(t)
         temb_2 = self.time_embedding_1(t)
+        temb_3 = self.time_embedding_2(t)
+        temb_4 = self.time_embedding_3(t)
 
         up0 = self.up0(latent_vec)
-        up1 = self.up1(up0+temb_1, down1)
-        up2 = self.up2(up1+temb_2, down0)
-        return self._up(torch.cat((up2, x), 1)) # New
+        up1 = self.up1(up0+temb_1, down4)
+        up2 = self.up2(up1+temb_2, down3)
+        up3 = self.up3(up2+temb_3, down2)
+        up4 = self.up4(up3+temb_4, down1)
+        return self._up(torch.cat((up4, x), 1)) # New
     # def on_before_optimizer_step(self, optimizer) -> None:
     #     print("on_before_opt enter")
     #     for name,p in self.named_parameters():
@@ -115,7 +127,7 @@ class Model(pl.LightningModule):
     def plot_sample(self, imgs):
         # Take first image of batch
         imgs = imgs[[0], :, :, :]
-        img, _ = self.image_diffuser(imgs[[0], :, :, :],19)
+        img, _ = self.image_diffuser(imgs[[0], :, :, :],self.config["T"]-1)
         org = torch.clone(img)
         for i in range(19, -1,-1):
             _t = torch.tensor([[i]],device=img.device)
