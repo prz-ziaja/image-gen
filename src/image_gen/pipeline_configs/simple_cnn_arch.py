@@ -23,7 +23,7 @@ training = {
     "data_module_hparams_shared":{
         "image_size": IMAGE_SIZE,
         "columns": ("image", ),#"encoded_sentence"),
-        "batch_size": 128,
+        "batch_size": 64,
     },
     "data_module_kwargs":{
         "dataset_name": DATASET_NAME,
