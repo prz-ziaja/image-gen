@@ -41,7 +41,7 @@ class rearrangePolling2d(nn.Module):
         x = self.conv(x)
         return x
 
-class upBlock2d(nn.Module):
+class upBlock2dWithSkip(nn.Module):
     def __init__(self, in_chs, out_chs, group_size):
         nn.Module.__init__(self)
 
@@ -54,6 +54,21 @@ class upBlock2d(nn.Module):
 
     def forward(self, x, skip):
         x = torch.cat((x, skip), 1)
+        x = self.model(x)
+        return x
+    
+class upBlock2d(nn.Module):
+    def __init__(self, in_chs, out_chs, group_size):
+        nn.Module.__init__(self)
+
+        layers = [
+            nn.ConvTranspose2d(in_chs, out_chs, 2, 2),
+            geluConv2d(in_channels=out_chs, out_channels=out_chs, num_groups=group_size),
+            geluConv2d(in_channels=out_chs, out_channels=out_chs, num_groups=group_size),
+        ]
+        self.model = nn.Sequential(*layers)
+
+    def forward(self, x):
         x = self.model(x)
         return x
 
