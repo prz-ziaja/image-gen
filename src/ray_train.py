@@ -39,7 +39,7 @@ def build_train_func(model_module, data_module, data_module_args, experiment_nam
         trainer = pl.Trainer(
             devices="auto",
             accelerator="auto",
-            strategy=RayDDPStrategy(),
+            strategy=RayDDPStrategy(find_unused_parameters=True),
             callbacks=[RayTrainReportCallback()],
             plugins=[RayLightningEnvironment()],
             enable_progress_bar=True,
@@ -84,8 +84,6 @@ def main(module_name):
 
     model_module = importlib.import_module(model_name)
     dataset_module = importlib.import_module(dataset_name)
-
-    data_location = dataset_module.output_path
 
     train_func = build_train_func(
         model_module, dataset_module.dataloader, data_module_args, experiment_name=experiment_name
