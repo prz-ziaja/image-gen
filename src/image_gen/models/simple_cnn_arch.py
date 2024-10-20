@@ -14,17 +14,20 @@ import mlflow
 def temp_vis(image):
     # TODO: rewrite this
     reverse_dataset_preprocessing = transforms.Compose([
-        transforms.Lambda(lambda t: (torch.tensor([58.4, 57.12, 57.38]).reshape([3,1,1])*t + torch.tensor([123.68, 116.28, 103.53]).reshape([3,1,1]))/255),
-        transforms.Lambda(lambda t: torch.minimum(torch.tensor([1]), t)),
-        transforms.Lambda(lambda t: torch.maximum(torch.tensor([0]), t)),
-        transforms.ToPILImage(),
+        #transforms.Lambda(lambda t: (torch.tensor([58.4, 57.12, 57.38]).reshape([3,1,1])*t + torch.tensor([123.68, 116.28, 103.53]).reshape([3,1,1]))/255),
+        #transforms.Lambda(lambda t: torch.minimum(torch.tensor([255]), t)),
+        #transforms.Lambda(lambda t: torch.maximum(torch.tensor([0]), t)),
+        #transforms.Lambda(lambda t: t.to(torch.uint8)),
+        transforms.Lambda(lambda t: t-t.min()),
+        transforms.Lambda(lambda t: t/(t.max()+0.0001)),
     ])
-    plt.imshow(reverse_dataset_preprocessing(image[0].detach().cpu()))
+
+    plt.imshow(reverse_dataset_preprocessing(image[0].detach().cpu()).permute([1,2,0]))
 
 class Model(pl.LightningModule):
     def __init__(self, config):
         pl.LightningModule.__init__(self)
-        IMG_CH = 3
+        IMG_CH = config["image_ch"]
         IMG_SIZE = config["image_size"][0]
         down_chs = (64, 128, 128, 256, 256)
         up_chs = down_chs[::-1]  # Reverse of the down channels
@@ -115,13 +118,15 @@ class Model(pl.LightningModule):
 
         self.log("train_loss", loss.detach().cpu().item())
         # print(f"Recent loss: {loss.detach().cpu().item():.5f}", end="\r")
-        if batch_idx % 25 == 0:
-            self.on_train_epoch_end()
+        if batch_idx % 50 == 0:
+            filename = self.plot_sample(self.last_batch)
+            mlflow.log_artifact(filename)
         return loss
 
     def on_train_epoch_end(self):
         filename = self.plot_sample(self.last_batch)
         mlflow.log_artifact(filename)
+        mlflow.pytorch.log_model(self, f"{int(time.time())}.pt")
 
     @torch.no_grad()
     def plot_sample(self, imgs):
@@ -129,11 +134,11 @@ class Model(pl.LightningModule):
         imgs = imgs[[0], :, :, :]
         img, _ = self.image_diffuser(imgs[[0], :, :, :],self.config["T"]-1)
         org = torch.clone(img)
-        for i in range(19, -1,-1):
+        for i in range(self.config["T"]-1, -1,-1):
             _t = torch.tensor([[i]],device=img.device)
             img = self.image_diffuser.reverse(img, self.forward(img, _t),_t)
             
-            if i == 10:
+            if i == (self.config["T"]-1)//2:
                 halfway = torch.clone(img)
 
         nrows = 2
@@ -154,33 +159,32 @@ class Model(pl.LightningModule):
         return filename
         
 
-    def validation_step(self, val_batch, batch_idx):
-        return
-        x, y = val_batch["hsv"], val_batch["labels"].flatten().long()
+    # def validation_step(self, val_batch, batch_idx):
+    #     return
+    #     x, y = val_batch["hsv"], val_batch["labels"].flatten().long()
 
-        logits = self.forward(x)
-        loss = self.compute_loss(logits, y)
-        self.eval_loss.append(loss)
+    #     logits = self.forward(x)
+    #     loss = self.compute_loss(logits, y)
+    #     self.eval_loss.append(loss)
 
-        self.eval_preds.append(logits.argmax(dim=-1))
-        self.eval_true.append(y)
+    #     self.eval_preds.append(logits.argmax(dim=-1))
+    #     self.eval_true.append(y)
         
 
-    def on_validation_epoch_end(self):
-        mlflow.pytorch.log_model(self, f"{int(time.time())}.pt")
-        return
-        avg_loss = torch.stack(self.eval_loss).cpu().mean()
-        self.log("val_loss", avg_loss, sync_dist=True)
-        self.eval_loss.clear()
+    # def on_validation_epoch_end(self):
+    #     return
+    #     avg_loss = torch.stack(self.eval_loss).cpu().mean()
+    #     self.log("val_loss", avg_loss, sync_dist=True)
+    #     self.eval_loss.clear()
 
-        f1_score = -classification_report(
-            torch.cat(self.eval_true).cpu(),
-            torch.cat(self.eval_preds).cpu(),
-            output_dict=True
-        )["weighted avg"]["f1-score"]
-        self.log("val_neg_f1", f1_score, sync_dist=True)
-        self.eval_preds.clear()
-        self.eval_true.clear()
+    #     f1_score = -classification_report(
+    #         torch.cat(self.eval_true).cpu(),
+    #         torch.cat(self.eval_preds).cpu(),
+    #         output_dict=True
+    #     )["weighted avg"]["f1-score"]
+    #     self.log("val_neg_f1", f1_score, sync_dist=True)
+    #     self.eval_preds.clear()
+    #     self.eval_true.clear()
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
