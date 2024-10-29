@@ -7,15 +7,20 @@ from torch.utils.data import DataLoader, Dataset, random_split
 from importlib import import_module
 from pathlib import Path
 import torchvision
-import torchvision.transforms as transforms
+from torchvision.transforms import v2
 
 
 class customDataset(Dataset):
-    def __init__(self):
+    def __init__(self, dataset_name:str, image_size:int, train:bool):
+        dataset = import_module(dataset_name)
         self.train_ds = torchvision.datasets.FashionMNIST(
             "/tmp/data/",
             download=True,
-            transform=transforms.Compose([transforms.ToTensor(), transforms.Resize(32),])
+            train=train,
+            transform=v2.Compose([
+                *dataset.transform,
+                v2.Resize(image_size),
+            ])
         )
 
     def __len__(self):
@@ -26,8 +31,9 @@ class customDataset(Dataset):
         enc = torch.zeros(10)
         enc[sample[1]] = 1
         return {"image": sample[0], "encoded_sentence":enc}
+
 class customDataModule(pl.LightningDataModule):
-    def __init__(self, dataset_name: str, columns: tuple=None, batch_size=512, **kwargs):
+    def __init__(self, dataset_name: str, image_size:int, columns: tuple=None, batch_size=512, **kwargs):
         pl.LightningDataModule.__init__(self)
 
         dataset = import_module(dataset_name)
@@ -38,7 +44,15 @@ class customDataModule(pl.LightningDataModule):
 
     def setup(self, stage: str):
         torch.random.manual_seed(10)
-        self.train_ds = customDataset()
+        if stage == "fit":
+            train_val_ds = customDataset(dataset_name=self.dataset_name, train=True)
+            self.train_ds, self.val_ds = random_split(train_val_ds, [0.8, 0.2])
+        elif stage == "test":
+            train_val_ds = customDataset(dataset_name=self.dataset_name, train=False)
+        else:
+            raise Exception(f"Stage `{stage}` is not supported - pick (fit|test)")
+
+        
 
     def train_dataloader(self):
         return DataLoader(self.train_ds, batch_size=self.batch_size)

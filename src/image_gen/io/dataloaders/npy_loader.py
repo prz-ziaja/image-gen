@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from filelock import FileLock
 from torch.utils.data import DataLoader, Dataset, random_split
+from torchvision.transforms import v2
 from importlib import import_module
 from pathlib import Path
 
@@ -19,13 +20,17 @@ Structure of directory containing images
 """
 
 class customDataset(Dataset):
-    def __init__(self, image_dir_path:str, metadata: dict, columns: tuple, dataset_name:str, reading_class:str):
+    def __init__(self, image_dir_path:str, metadata: dict, columns: tuple, image_size: int, dataset_name:str, reading_class:str):
         self.columns = columns
         self.metadata = metadata
         self.image_dir_path = Path(image_dir_path)
 
         dataset = import_module(dataset_name)
-        self.transform = dataset.transform
+        self.transform = v2.Compose([
+            *dataset.transform,
+            v2.Resize(image_size),
+            v2.RandomCrop((image_size, image_size)),
+        ])
         self.reader = import_module(reading_class).Reader()
         for column in columns:
             if column not in self.metadata and column != "image":
@@ -42,7 +47,7 @@ class customDataset(Dataset):
         return {k:self.metadata.get(k, None) for k in self.columns} | {'image': image}
 
 class customDataModule(pl.LightningDataModule):
-    def __init__(self, dataset_name: str, reading_class:str, columns: tuple=None, batch_size=512, **kwargs):
+    def __init__(self, dataset_name: str, reading_class:str, image_size:int, columns: tuple=None, batch_size=512, **kwargs):
         pl.LightningDataModule.__init__(self)
 
         dataset = import_module(dataset_name)
@@ -52,6 +57,7 @@ class customDataModule(pl.LightningDataModule):
         
         self.columns = columns
         self.batch_size = batch_size
+        self.image_size = image_size
 
         self.reading_class = reading_class
         self.reader = import_module(reading_class).Reader()
@@ -63,12 +69,12 @@ class customDataModule(pl.LightningDataModule):
         train = {k:v[loaded_data['is_train']] for k,v in loaded_data.items()}
         test = {k:v[~loaded_data['is_train']] for k,v in loaded_data.items()}
         if stage == "fit":
-            train_val_ds = customDataset(image_dir_path=self.image_dir_path, metadata=train, columns=self.columns, dataset_name=self.dataset_name, reading_class=self.reading_class)
+            train_val_ds = customDataset(image_dir_path=self.image_dir_path, metadata=train, columns=self.columns, dataset_name=self.dataset_name, reading_class=self.reading_class, image_size=self.image_size)
             self.train_ds, self.val_ds = random_split(train_val_ds, [0.8, 0.2])
         elif stage == "test":
-            self.test_ds = customDataset(self.image_dir_path, test, self.columns, self.dataset_name, self.reading_class)
+            self.test_ds = customDataset(self.image_dir_path, test, self.columns, self.dataset_name, self.reading_class, image_size=self.image_size)
         else:
-            raise Exception(f"Stage `{stage}` is not supported - pick (train|test)")
+            raise Exception(f"Stage `{stage}` is not supported - pick (fit|test)")
 
     def train_dataloader(self):
         return DataLoader(self.train_ds, batch_size=self.batch_size)
@@ -84,7 +90,7 @@ if __name__ == "__main__":
     import torch.nn as nn
     sys.path.append("/home/przemek/Desktop/image-gen/src")
     c = nn.Conv2d(3,5,3)
-    dd = customDataModule('image_gen.io.datasets.coca_001', 'image_gen.io.local_fs', ['encoded_sentence', ], batch_size=8)
+    dd = customDataModule('image_gen.io.datasets.coca_001', 'image_gen.io.local_fs', ['encoded_sentence', ], batch_size=8, image_size=16)
     dd.setup("test")
     test_dl = dd.test_dataloader()
     for i in test_dl:

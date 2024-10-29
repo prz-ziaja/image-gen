@@ -15,13 +15,18 @@ dataloader = customDataModule
 metadata_path = output_path
 image_dir_path = input_path
 
-transform = v2.Compose([
+# transform for dataloader
+transform = [
     v2.ToImage(),
     v2.ToDtype(torch.float32),
-    v2.Resize(64),
-    v2.RandomCrop((64,64)),
-    v2.Normalize(mean=[123.68, 116.28, 103.53], std=[58.4, 57.12, 57.38]),
-])
+    v2.Normalize(mean=[127.5,]*3, std=[127.5,]*3),
+]
+
+# inverse transform for training validation
+inv_transform = [
+    v2.Normalize(mean=[-1,]*3, std=[1/127.5,]*3),
+    v2.ToDtype(torch.uint8),
+]
 
 keys_to_save = [
     "file_name",
