@@ -16,7 +16,7 @@ class customDataset(Dataset):
         self.train_ds = torchvision.datasets.FashionMNIST(
             "/tmp/data/",
             download=True,
-            train=train,
+            #train=train,
             transform=v2.Compose([
                 *dataset.transform,
                 v2.Resize(image_size),
@@ -40,15 +40,16 @@ class customDataModule(pl.LightningDataModule):
         self.dataset_name = dataset_name
         
         self.columns = columns
+        self.image_size = image_size
         self.batch_size = batch_size
 
     def setup(self, stage: str):
         torch.random.manual_seed(10)
         if stage == "fit":
-            train_val_ds = customDataset(dataset_name=self.dataset_name, train=True)
+            train_val_ds = customDataset(dataset_name=self.dataset_name, image_size=self.image_size, train=True)
             self.train_ds, self.val_ds = random_split(train_val_ds, [0.8, 0.2])
         elif stage == "test":
-            train_val_ds = customDataset(dataset_name=self.dataset_name, train=False)
+            train_val_ds = customDataset(dataset_name=self.dataset_name, image_size=self.image_size, train=False)
         else:
             raise Exception(f"Stage `{stage}` is not supported - pick (fit|test)")
 
@@ -57,11 +58,11 @@ class customDataModule(pl.LightningDataModule):
     def train_dataloader(self):
         return DataLoader(self.train_ds, batch_size=self.batch_size)
 
-    # def val_dataloader(self):
-    #     return DataLoader(self.val_ds, batch_size=self.batch_size)
+    def val_dataloader(self):
+        return DataLoader(self.val_ds, batch_size=self.batch_size)
 
-    # def test_dataloader(self):
-    #     return DataLoader(self.test_ds, batch_size=self.batch_size)
+    def test_dataloader(self):
+        return DataLoader(self.test_ds, batch_size=self.batch_size)
 
 if __name__ == "__main__":
     import sys

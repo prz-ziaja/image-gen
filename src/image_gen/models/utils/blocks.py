@@ -3,12 +3,12 @@ import torch.nn as nn
 from einops.layers.torch import Rearrange
 
 class activatedConv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, dilation=1, groups=1, bias=True, num_groups=1, act_function=nn.GELU()):
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, dilation=1, groups=1, bias=True, num_groups=1, act_function=nn.GELU):
         nn.Module.__init__(self)
 
         self.model = nn.Sequential(
-            nn.Conv2d(in_channels=self.in_channels, out_channels=self.out_channels, kernel_size=self.kernel_size, stride=self.stride, padding=self.padding),
-            nn.GroupNorm(num_groups, self.out_channels),
+            nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride, padding=padding, groups=groups, dilation=dilation),
+            nn.GroupNorm(num_groups, out_channels),
             act_function(),
         )
 
@@ -60,7 +60,7 @@ class upBlock2dDoubleInput(upBlock2d):
 
     def forward(self, x, skip):
         x = torch.cat((x, skip), 1)
-        return upBlock2d(self, x)
+        return super(upBlock2dDoubleInput, self).forward(x)
 
 class downBlock2d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, group_size=1):

@@ -23,17 +23,17 @@ training = {
     "data_module_hparams_shared":{
         "image_size": IMAGE_SIZE,
         "columns": ("image", ),#"encoded_sentence"),
-        "batch_size": 64,
+        "batch_size": 128,
     },
     "data_module_kwargs":{
         "dataset_name": DATASET_NAME,
     },
     "hparams": {
         "lr": 0.001,#tune.qloguniform(1e-4, 1e-2, 1e-5),
-        "T": 60,
+        "T": 150,
         "image_ch": 1,
-        "t_start": 6e-4,
-        "t_end": 8e-2,
-        "loss_function": tune.choice([nn.MSELoss(),])
+        "t_start": 1e-4,
+        "t_end": 2e-2,
+        "loss_function": tune.choice([nn.MSELoss(),]),
     },
 }
