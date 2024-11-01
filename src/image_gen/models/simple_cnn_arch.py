@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import time
+import numpy as np
 import torchvision.transforms as transforms
 import image_gen.models.utils.blocks as blocks
 import image_gen.models.utils.embeddings as embeddings
@@ -29,7 +30,8 @@ class Model(pl.LightningModule):
         pl.LightningModule.__init__(self)
         IMG_CH = config["image_ch"]
         IMG_SIZE = config["image_size"][0]
-        down_chs = (64, 64, 128)
+        ENCODED_SENTENCE_SIZE = config["encoded_sentence_size"]
+        down_chs = (64, 64, 128, 128, 128)
         up_chs = down_chs[::-1]  # Reverse of the down channels
         latent_image_size = IMG_SIZE // ( 2 ** (len(down_chs) - 1))
         self.config = config
@@ -38,13 +40,13 @@ class Model(pl.LightningModule):
 
         self.time_embedding_0 = embeddings.embedBlock(1, [16, up_chs[0]])
         self.time_embedding_1 = embeddings.embedBlock(1, [16, up_chs[1]])
-        #self.time_embedding_2 = embeddings.embedBlock(8, [16, up_chs[2]])
-        #self.time_embedding_3 = embeddings.embedBlock(8, [16, up_chs[3]])
+        self.time_embedding_2 = embeddings.embedBlock(1, [16, up_chs[2]])
+        self.time_embedding_3 = embeddings.embedBlock(1, [16, up_chs[3]])
 
-        self.cat_embedding_0 = embeddings.embedBlock(10, [16, up_chs[0]])
-        self.cat_embedding_1 = embeddings.embedBlock(10, [16, up_chs[1]])
-        #self.cat_embedding_2 = embeddings.embedBlock(10, [16, up_chs[2]])
-        #self.cat_embedding_3 = embeddings.embedBlock(10, [16, up_chs[3]])
+        self.cat_embedding_0 = embeddings.embedBlock(ENCODED_SENTENCE_SIZE, [16, up_chs[0]])
+        self.cat_embedding_1 = embeddings.embedBlock(ENCODED_SENTENCE_SIZE, [16, up_chs[1]])
+        self.cat_embedding_2 = embeddings.embedBlock(ENCODED_SENTENCE_SIZE, [16, up_chs[2]])
+        self.cat_embedding_3 = embeddings.embedBlock(ENCODED_SENTENCE_SIZE, [16, up_chs[3]])
 
         self._down = blocks.activatedConv2d(IMG_CH, down_chs[0], stride=1)
         self._up = nn.Sequential(
@@ -57,8 +59,8 @@ class Model(pl.LightningModule):
         # Downsample
         self.down1 = blocks.downBlock2d(down_chs[0], down_chs[1], group_size=8) # New
         self.down2 = blocks.downBlock2d(down_chs[1], down_chs[2], group_size=8) # New
-        # self.down3 = blocks.downBlock2d(down_chs[2], down_chs[2], group_size=8) # New
-        # self.down4 = blocks.downBlock2d(down_chs[3], down_chs[4], group_size=8) # New
+        self.down3 = blocks.downBlock2d(down_chs[2], down_chs[3], group_size=8) # New
+        self.down4 = blocks.downBlock2d(down_chs[3], down_chs[4], group_size=8) # New
         self.to_vec = nn.Sequential(nn.Flatten(), nn.GELU())
 
         # Embeddings
@@ -78,8 +80,8 @@ class Model(pl.LightningModule):
         )
         self.up1 = blocks.upBlock2dDoubleInput(up_chs[0], up_chs[0], up_chs[1], group_size=8) # New
         self.up2 = blocks.upBlock2dDoubleInput(up_chs[1], up_chs[1], up_chs[2], group_size=8) # New
-        # self.up3 = blocks.upBlock2dDoubleInput(up_chs[2], up_chs[2], group_size=8) # New
-        #self.up4 = blocks.upBlock2dDoubleInput(up_chs[3], up_chs[4], group_size=8) # New
+        self.up3 = blocks.upBlock2dDoubleInput(up_chs[2], up_chs[2], up_chs[3], group_size=8) # New
+        self.up4 = blocks.upBlock2dDoubleInput(up_chs[3], up_chs[3], up_chs[4], group_size=8) # New
 
         print(f"Device: {self.device}")
         self.lr = config["lr"]
@@ -90,51 +92,47 @@ class Model(pl.LightningModule):
         return self.loss_function(imgs, imgs_pred)
 
     def forward(self, x, t:int, cat:int):
+        
         x = self._down(x)
         down1 = self.down1(x)
         down2 = self.down2(down1)
-        #down3 = self.down3(down2)
-        #down4 = self.down4(down3)
-        latent_vec = self.to_vec(down2)
-
+        down3 = self.down3(down2)
+        down4 = self.down4(down3)
+        latent_vec = self.to_vec(down4)
+        
         latent_vec = self.dense_emb(latent_vec)
         t = t.float() / self.config["T"]  # Convert from [0, T] to [0, 1]
-        #print(f"$$$$$$$$$$$$$$$$$$$$$$$$$$$$ {t.shape}")
+        
         temb_1 = self.time_embedding_0(t)
         temb_2 = self.time_embedding_1(t)
-        #temb_3 = self.time_embedding_2(t)
-        #temb_4 = self.time_embedding_3(t)
-
+        temb_3 = self.time_embedding_2(t)
+        temb_4 = self.time_embedding_3(t)
+        
         cat_1 = self.cat_embedding_0(cat)
         cat_2 = self.cat_embedding_1(cat)
-        #cat_3 = self.cat_embedding_2(cat)
-        #cat_4 = self.cat_embedding_3(cat)
-
+        cat_3 = self.cat_embedding_2(cat)
+        cat_4 = self.cat_embedding_3(cat)
+        
         up0 = self.up0(latent_vec)
-        up1 = self.up1(cat_1*up0+temb_1, down2)
-        up2 = self.up2(cat_2*up1+temb_2, down1)
-        #up3 = self.up3(cat_3*up2+temb_3, down1)
-        #up4 = self.up4(cat_4*up3+temb_4, down1)
-        return self._up(torch.cat((up2, x), 1)) # New
-    # def on_before_optimizer_step(self, optimizer) -> None:
-    #     print("on_before_opt enter")
-    #     for name,p in self.named_parameters():
-    #         if p.grad is None:
-    #             print(name, p.shape)
+        up1 = self.up1(cat_1*up0+temb_1, down4)
+        up2 = self.up2(cat_2*up1+temb_2, down3)
+        up3 = self.up3(cat_3*up2+temb_3, down2)
+        up4 = self.up4(cat_4*up3+temb_4, down1)
+        
+        return self._up(torch.cat((up4, x), 1)) # New
 
-    #     print("on_before_opt exit")
     def training_step(self, train_batch, batch_idx):
-
+        
         self.last_batch = train_batch
-
+        
         x = train_batch["image"].to(self.device)
         sentence = train_batch["encoded_sentence"].to(self.device)
         t = torch.randint(0, self.config["T"], (x.shape[0],1), device=self.device)
-
+        
         imgs_noisy, noise = self.image_diffuser(x, t)
         preds = self.forward(imgs_noisy, t, sentence)
         loss = self.compute_loss(noise, preds)
-
+        
         self.log("train_loss", loss.detach().cpu().item())
         # print(f"Recent loss: {loss.detach().cpu().item():.5f}", end="\r")
         if batch_idx % 50 == 0:
@@ -168,7 +166,7 @@ class Model(pl.LightningModule):
             "Original" : imgs,
             "At the beginning": org,
             "Halfway" : halfway,
-            f"Predicted Original {sen}" : img
+            f"Predicted Original {np.argmax(sen.detach().cpu())}" : img
         }
         for i, (title, img) in enumerate(samples.items()):
             ax = plt.subplot(nrows, ncols, i+1)
@@ -178,7 +176,10 @@ class Model(pl.LightningModule):
         filename = f"/tmp/{int(time.time())}.png"
         plt.savefig(filename)
         return filename
-        
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+        return optimizer
 
     # def validation_step(self, val_batch, batch_idx):
     #     return
@@ -207,6 +208,10 @@ class Model(pl.LightningModule):
     #     self.eval_preds.clear()
     #     self.eval_true.clear()
 
-    def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
-        return optimizer
+    # def on_before_optimizer_step(self, optimizer) -> None:
+    #     print("on_before_opt enter")
+    #     for name,p in self.named_parameters():
+    #         if p.grad is None:
+    #             print(name, p.shape)
+
+    #     print("on_before_opt exit")

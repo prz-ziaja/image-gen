@@ -24,6 +24,7 @@ training = {
         "image_size": IMAGE_SIZE,
         "columns": ("image", ),#"encoded_sentence"),
         "batch_size": 128,
+        "encoded_sentence_size": 10,
     },
     "data_module_kwargs":{
         "dataset_name": DATASET_NAME,

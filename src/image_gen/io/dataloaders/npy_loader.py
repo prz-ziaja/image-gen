@@ -29,7 +29,7 @@ class customDataset(Dataset):
         self.transform = v2.Compose([
             *dataset.transform,
             v2.Resize(image_size),
-            v2.RandomCrop((image_size, image_size)),
+            v2.RandomCrop(image_size),
         ])
         self.reader = import_module(reading_class).Reader()
         for column in columns:
@@ -44,10 +44,10 @@ class customDataset(Dataset):
         subdir = "train" if self.metadata['is_train'][idx] else "validation"
         loaded_image = self.reader.read_image(str(self.image_dir_path / subdir / "data" / file_name))
         image = self.transform(loaded_image) if self.transform is not None else loaded_image
-        return {k:self.metadata.get(k, None) for k in self.columns} | {'image': image}
+        return {k:self.metadata[k][idx] for k in self.columns if k in self.metadata} | {'image': image}
 
 class customDataModule(pl.LightningDataModule):
-    def __init__(self, dataset_name: str, reading_class:str, image_size:int, columns: tuple=None, batch_size=512, **kwargs):
+    def __init__(self, dataset_name: str, reading_class:str, image_size:int, columns: tuple=None, batch_size=512, num_workers=4, **kwargs):
         pl.LightningDataModule.__init__(self)
 
         dataset = import_module(dataset_name)
@@ -61,6 +61,7 @@ class customDataModule(pl.LightningDataModule):
 
         self.reading_class = reading_class
         self.reader = import_module(reading_class).Reader()
+        self.num_workers = num_workers
 
     def setup(self, stage: str):
         torch.random.manual_seed(10)
@@ -77,13 +78,13 @@ class customDataModule(pl.LightningDataModule):
             raise Exception(f"Stage `{stage}` is not supported - pick (fit|test)")
 
     def train_dataloader(self):
-        return DataLoader(self.train_ds, batch_size=self.batch_size)
+        return DataLoader(self.train_ds, batch_size=self.batch_size, num_workers=self.num_workers)
 
     def val_dataloader(self):
-        return DataLoader(self.val_ds, batch_size=self.batch_size)
+        return DataLoader(self.val_ds, batch_size=self.batch_size, num_workers=self.num_workers)
 
     def test_dataloader(self):
-        return DataLoader(self.test_ds, batch_size=self.batch_size)
+        return DataLoader(self.test_ds, batch_size=self.batch_size, num_workers=self.num_workers)
 
 if __name__ == "__main__":
     import sys

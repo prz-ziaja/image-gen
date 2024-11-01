@@ -22,18 +22,20 @@ training = {
     },
     "data_module_hparams_shared":{
         "image_size": IMAGE_SIZE,
-        "columns": ("image", ),#"encoded_sentence"),
+        "columns": ("image", "encoded_sentence"),
         "batch_size": 64,
+        "encoded_sentence_size": 384,
     },
     "data_module_kwargs":{
         "dataset_name": DATASET_NAME,
         "reading_class": "image_gen.io.local_fs",
     },
     "hparams": {
-        "lr": 0.0001,#tune.qloguniform(1e-4, 1e-2, 1e-5),
-        "T": 60,
-        "t_start": 6e-4,
-        "t_end": 8e-2,
+        "lr": 0.001,#tune.qloguniform(1e-4, 1e-2, 1e-5),
+        "T": 150,
+        "image_ch": 3,
+        "t_start": 1e-4,
+        "t_end": 2e-2,
         "loss_function": tune.choice([nn.MSELoss(),])
     },
 }

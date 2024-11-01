@@ -3,6 +3,7 @@ import importlib
 import lightning.pytorch as pl
 import mlflow
 import ray
+import torch
 from ray import train, tune
 from ray.air.integrations.mlflow import MLflowLoggerCallback, setup_mlflow
 from ray.train import CheckpointConfig, RunConfig, ScalingConfig
@@ -45,6 +46,7 @@ def build_train_func(model_module, data_module, data_module_args, experiment_nam
             enable_progress_bar=True,
             logger=mlf_logger,
         )
+        torch.compile(model)
         trainer = prepare_trainer(trainer)
         trainer.fit(model, datamodule=dm)
 
