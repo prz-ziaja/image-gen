@@ -32,6 +32,7 @@ def build_train_func(model_module, data_module, data_module_args, experiment_nam
            #ctx.get_local_rank()        ctx.get_metadata()          ctx.get_storage()           ctx.get_trial_id()          ctx.get_trial_resources()   ctx.get_world_size()
            run_name=train.get_context().get_trial_name(),
            tracking_uri="http://127.0.0.1:5000",
+           create_experiment_if_not_exists=True,
            #tags={"trial_dir":train.get_context().get_trial_dir()}
         )
 
