@@ -109,7 +109,8 @@ class Model(pl.LightningModule):
         self.noise_vector_len = config["noise_vector_len"]
         
         self.number_of_generated_batches = config["number_of_generated_batches"]
-        self.lr = config["lr"]
+        self.critic_lr = config["critic_lr"]
+        self.geneartor_lr = config["generator_lr"]
         self.clamp_val = config["clamp_val"]
         self.automatic_optimization = False
 
@@ -245,6 +246,6 @@ class Model(pl.LightningModule):
     #     self.eval_true.clear()
 
     def configure_optimizers(self):
-        opt_g = torch.optim.Adam(self.generator.parameters(), lr=self.lr)
-        opt_c = torch.optim.Adam(self.critic.parameters(), lr=self.lr)
+        opt_g = torch.optim.Adam(self.generator.parameters(), lr=self.geneartor_lr)
+        opt_c = torch.optim.Adam(self.critic.parameters(), lr=self.critic_lr)
         return [opt_g, opt_c], []

@@ -23,12 +23,13 @@ training = {
     "data_module_hparams_shared":{
         "image_size": IMAGE_SIZE,
         "columns": ("image", "encoded_sentence"),
-        "batch_size": 64,
+        "batch_size": 128,
         "encoded_sentence_size": 384,
     },
     "data_module_kwargs":{
         "dataset_name": DATASET_NAME,
         "reading_class": "image_gen.io.local_fs",
+        "num_workers": 4,
     },
     "hparams": {
         "lr": 0.001,#tune.qloguniform(1e-4, 1e-2, 1e-5),

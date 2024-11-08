@@ -13,7 +13,7 @@ training = {
     "max_num_epochs": 1000,
     "max_num_samples": 1,
     "model_name": "image_gen.models.simple_cnn_arch",
-    "experiment_name": "Default",#"generator",
+    "experiment_name": "FMNIST SD",
     "scaling_config": {
         "num_workers": 1,
         #"resources_per_worker": {"CPU": 3},
@@ -33,8 +33,8 @@ training = {
         "lr": 0.001,#tune.qloguniform(1e-4, 1e-2, 1e-5),
         "T": 150,
         "image_ch": 1,
-        "t_start": 1e-4,
-        "t_end": 2e-2,
+        "t_start": 2e-4,
+        "t_end": 4e-2,
         "loss_function": tune.choice([nn.MSELoss(),]),
     },
 }
