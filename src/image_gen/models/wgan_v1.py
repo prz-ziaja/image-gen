@@ -1,10 +1,8 @@
 import lightning.pytorch as pl
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import time
-import torchvision.transforms as transforms
 import image_gen.models.utils.blocks as blocks
 import image_gen.models.utils.embeddings as embeddings
 import image_gen.models.utils.image_diffusers as image_diffusers
@@ -13,34 +11,35 @@ from einops.layers.torch import Rearrange
 
 import mlflow
 
+
 def temp_vis(image):
-    plt.imshow(image[0].permute([1,2,0]).detach().cpu())
+    plt.imshow(image[0].permute([1, 2, 0]).detach().cpu())
+
 
 class generator(nn.Module):
-    def __init__(self,config):
+    def __init__(self, config):
         nn.Module.__init__(self)
         self.noise_emb = self.latent_embed = embeddings.embedBlock(
-            input_size=config["noise_vector_len"],
-            layer_sizes=[256,128]
+            input_size=config["noise_vector_len"], layer_sizes=[256, 128]
         )
         IMG_SIZE = config["image_size"][0]
         IMG_CH = config["image_ch"]
 
         if IMG_SIZE == 32:
             self.img_upscale = nn.Sequential(
-                blocks.upBlock2d(2,8,2),
-                blocks.geluConv2d(8,16),
-                blocks.upBlock2d(16,32,2),
-                nn.Conv2d(32,IMG_CH, (1,1)),
+                blocks.upBlock2d(2, 8, 2),
+                blocks.geluConv2d(8, 16),
+                blocks.upBlock2d(16, 32, 2),
+                nn.Conv2d(32, IMG_CH, (1, 1)),
             )
         elif IMG_SIZE == 64:
             self.img_upscale = nn.Sequential(
-                blocks.upBlock2d(2,32,2),
-                blocks.geluConv2d(32,64),
-                blocks.upBlock2d(64,128,2),
-                blocks.geluConv2d(128,256),
-                blocks.upBlock2d(256, 64,2),
-                nn.Conv2d(64,IMG_CH, (1,1)),
+                blocks.upBlock2d(2, 32, 2),
+                blocks.geluConv2d(32, 64),
+                blocks.upBlock2d(64, 128, 2),
+                blocks.geluConv2d(128, 256),
+                blocks.upBlock2d(256, 64, 2),
+                nn.Conv2d(64, IMG_CH, (1, 1)),
             )
         self.rearrange = Rearrange("b (ch h w) 1 1 -> b ch h w", ch=2, h=8, w=8)
 
@@ -52,6 +51,7 @@ class generator(nn.Module):
 
         return x
 
+
 class discriminator(nn.Module):
     def __init__(self, config):
         nn.Module.__init__(self)
@@ -59,28 +59,28 @@ class discriminator(nn.Module):
         IMG_CH = config["image_ch"]
 
         self.img_downscale = nn.Sequential(
-            blocks.downBlock2d(IMG_CH,32,1),
-            blocks.geluConv2d(32,64),
-            blocks.downBlock2d(64,64,2),
-            blocks.geluConv2d(64,128),
-            blocks.downBlock2d(128,128,2),
-            blocks.geluConv2d(128,256),
-            blocks.downBlock2d(256,256,2),
-            blocks.geluConv2d(256,256),
-            blocks.downBlock2d(256,128,2),
+            blocks.downBlock2d(IMG_CH, 32, 1),
+            blocks.geluConv2d(32, 64),
+            blocks.downBlock2d(64, 64, 2),
+            blocks.geluConv2d(64, 128),
+            blocks.downBlock2d(128, 128, 2),
+            blocks.geluConv2d(128, 256),
+            blocks.downBlock2d(256, 256, 2),
+            blocks.geluConv2d(256, 256),
+            blocks.downBlock2d(256, 128, 2),
         )
 
         if IMG_SIZE == 32:
             linear_in = 1152
         elif IMG_SIZE == 64:
             linear_in = 2048
-        
+
         self.linear = nn.Sequential(
             nn.Linear(linear_in, 256),
             nn.GELU(),
-            nn.Linear(256,32),
+            nn.Linear(256, 32),
             nn.GELU(),
-            nn.Linear(32,1)
+            nn.Linear(32, 1),
         )
 
     def forward(self, x):
@@ -89,25 +89,29 @@ class discriminator(nn.Module):
         classified = self.linear(downscaled_flat)
         return classified
 
+
 class Model(pl.LightningModule):
     def __init__(self, config):
         pl.LightningModule.__init__(self)
-        
+
         self.generator = generator(config=config)
         self.critic = discriminator(config=config)
         self.config = config
-        self.image_diffuser = image_diffusers.imageDiffuser(config["T"], config["t_start"], config["t_end"])
+        self.image_diffuser = image_diffusers.imageDiffuser(
+            config["T"], config["t_start"], config["t_end"]
+        )
 
         print(f"Device: {self.device}")
-        self.noise_vector_len = 128#config{"noise_vector_len"}
+        self.noise_vector_len = 128  # config{"noise_vector_len"}
         self.lr = config["lr"]
         self.automatic_optimization = False
 
     def compute_loss(self, y_true, y_pred):
-        return torch.mean(y_true*y_pred)
+        return torch.mean(y_true * y_pred)
 
     def forward(self, z):
         return self.generator(z)
+
     # def on_before_optimizer_step(self, optimizer) -> None:
     #     print("on_before_opt enter")
     #     for name,p in self.named_parameters():
@@ -116,13 +120,15 @@ class Model(pl.LightningModule):
 
     #     print("on_before_opt exit")
     def training_step(self, train_batch, batch_idx):
-
         optimizer_g, optimizer_c = self.optimizers()
 
         self.toggle_optimizer(optimizer_c)
 
         x = train_batch["image"].to(self.device)
-        t = torch.ones([x.shape[0],1], dtype=torch.long,device=self.device)* self.config["image_noise_t"]
+        t = (
+            torch.ones([x.shape[0], 1], dtype=torch.long, device=self.device)
+            * self.config["image_noise_t"]
+        )
 
         imgs_noisy, _ = self.image_diffuser(x, t)
         self.last_batch = torch.clone(imgs_noisy)
@@ -131,9 +137,9 @@ class Model(pl.LightningModule):
         with torch.no_grad():
             fake = self(z)
 
-        y_fake = torch.ones([fake.shape[0],1], device=self.device)
-        y_true = (-1) * torch.ones([imgs_noisy.shape[0],1], device=self.device)
-        y_critic = torch.cat([y_fake,y_true])
+        y_fake = torch.ones([fake.shape[0], 1], device=self.device)
+        y_true = (-1) * torch.ones([imgs_noisy.shape[0], 1], device=self.device)
+        y_critic = torch.cat([y_fake, y_true])
         x_critic = torch.cat([fake, imgs_noisy])
 
         critic_preds = self.critic(x_critic)
@@ -144,12 +150,17 @@ class Model(pl.LightningModule):
         optimizer_c.zero_grad()
         self.untoggle_optimizer(optimizer_c)
 
-
         self.toggle_optimizer(optimizer_g)
         optimizer_g.zero_grad()
 
-        z = torch.randn(self.config["generated_image_per_step"], self.noise_vector_len, device=self.device)
-        y_generator = (-1) * torch.ones([self.config["generated_image_per_step"],1], device=self.device)
+        z = torch.randn(
+            self.config["generated_image_per_step"],
+            self.noise_vector_len,
+            device=self.device,
+        )
+        y_generator = (-1) * torch.ones(
+            [self.config["generated_image_per_step"], 1], device=self.device
+        )
 
         fake = self(z)
         generator_preds = self.critic(fake)
@@ -162,7 +173,7 @@ class Model(pl.LightningModule):
 
         _g_loss = generator_loss.detach().cpu().item()
         _c_loss = critic_loss.detach().cpu().item()
-        self.log("train_loss", (_c_loss + _g_loss)/2)
+        self.log("train_loss", (_c_loss + _g_loss) / 2)
         self.log("critic_loss", _c_loss)
         self.log("generator_loss", _g_loss)
 
@@ -181,20 +192,19 @@ class Model(pl.LightningModule):
         nrows = 2
         ncols = 2
         samples = {
-            "Original" : imgs,
+            "Original": imgs,
             "At the beginning": fake[[0]],
-            "Halfway" : fake[[1]],
-            "Predicted Original" : fake[[2]]
+            "Halfway": fake[[1]],
+            "Predicted Original": fake[[2]],
         }
         for i, (title, img) in enumerate(samples.items()):
-            ax = plt.subplot(nrows, ncols, i+1)
+            ax = plt.subplot(nrows, ncols, i + 1)
             ax.set_title(title)
             temp_vis(img)
 
         filename = f"/tmp/{int(time.time())}.png"
         plt.savefig(filename)
         return filename
-        
 
     # def validation_step(self, val_batch, batch_idx):
     #     return
@@ -206,7 +216,6 @@ class Model(pl.LightningModule):
 
     #     self.eval_preds.append(logits.argmax(dim=-1))
     #     self.eval_true.append(y)
-        
 
     # def on_validation_epoch_end(self):
     #     #mlflow.pytorch.log_model(self, f"{int(time.time())}.pt")

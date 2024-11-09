@@ -1,6 +1,5 @@
 from image_gen.constants import plugin_spec, function_spec
 from image_gen.io.dataloaders.npy_loader import customDataModule
-from image_gen.io.utils import get_s3_fs_pa
 from torchvision.transforms import v2
 import torch
 
@@ -19,12 +18,30 @@ image_dir_path = input_path
 transform = [
     v2.ToImage(),
     v2.ToDtype(torch.float32),
-    v2.Normalize(mean=[127.5,]*3, std=[127.5,]*3),
+    v2.Normalize(
+        mean=[
+            127.5,
+        ]
+        * 3,
+        std=[
+            127.5,
+        ]
+        * 3,
+    ),
 ]
 
 # inverse transform for training validation
 inv_transform = [
-    v2.Normalize(mean=[-1,]*3, std=[1/127.5,]*3),
+    v2.Normalize(
+        mean=[
+            -1,
+        ]
+        * 3,
+        std=[
+            1 / 127.5,
+        ]
+        * 3,
+    ),
     v2.ToDtype(torch.uint8),
 ]
 
@@ -52,9 +69,13 @@ plugins = (
     plugin_spec(
         "image_gen.preprocessing.sentence_embedding",
         "SentenceEncoder_map_batches",
-        {"text_key": "caption", "result_name": "encoded_sentence", "keep_source": False},
+        {
+            "text_key": "caption",
+            "result_name": "encoded_sentence",
+            "keep_source": False,
+        },
         {"SENETENCE_ENCODER_MODEL_NAME": "sentence-transformers/all-MiniLM-L6-v2"},
-        {"num_gpus": 0.25, "concurrency":4, "batch_size": 128},
+        {"num_gpus": 0.25, "concurrency": 4, "batch_size": 128},
     ),
 )
 
@@ -66,5 +87,5 @@ output_writer = function_spec(
         "path": output_path,
         # in case of s3
         # "filesystem": get_s3_fs_pa()
-    }
+    },
 )
