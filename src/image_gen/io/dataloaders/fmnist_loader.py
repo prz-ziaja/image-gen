@@ -70,24 +70,3 @@ class customDataModule(pl.LightningDataModule):
 
     def test_dataloader(self):
         return DataLoader(self.test_ds, batch_size=self.batch_size)
-
-
-if __name__ == "__main__":
-    import sys
-    import torch.nn as nn
-
-    sys.path.append("/home/przemek/Desktop/image-gen/src")
-    c = nn.Conv2d(3, 5, 3)
-    dd = customDataModule(
-        "image_gen.io.datasets.coca_001",
-        "image_gen.io.local_fs",
-        [
-            "encoded_sentence",
-        ],
-        batch_size=8,
-    )
-    dd.setup("test")
-    test_dl = dd.test_dataloader()
-    for i in test_dl:
-        print(c(i["image"]).shape)
-        break
