@@ -1,0 +1,18 @@
+stages:
+  - full_tests
+  - code_style
+
+tox:
+  image: pytorch/pytorch:1.8.1-cuda10.2-cudnn7-runtime
+  stage: full_tests
+  script:
+  - pip install -r req-dev.txt
+  - pip install -e .
+  - find ./tests -type f -name "*.py" | xargs -I^ pytest ^
+
+unit_test:
+   image: pytorch/pytorch:1.8.1-cuda10.2-cudnn7-runtime
+   stage: code_style
+   script:
+   - find ./ -type f -name "*.py" | xargs pylint --disable=W0703,C0116,C0114,R0903,C0103,R0913 --max-line-length=133
+
